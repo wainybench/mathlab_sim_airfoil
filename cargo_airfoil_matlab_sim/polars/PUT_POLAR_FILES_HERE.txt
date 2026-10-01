@@ -1,0 +1,1 @@
+Add one CSV per candidate airfoil with columns: Re, alpha_deg, CL, CD (optional CM).
