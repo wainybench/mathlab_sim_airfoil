@@ -1,12 +1,32 @@
 Payload_kg,Pass,Laps,Distance_ft,GroundRoll_ft,PeakC,Status
-0,1,3,4850.7475842319,37.5716098505345,24.0210562207871,END: battery reserve SOC reached
-0.05,1,3,4945.48300349084,39.8977426933272,24.0210562207871,END: battery reserve SOC reached
-0.1,1,3,5051.78672760271,42.244076612001,24.0210562207871,END: battery reserve SOC reached
-0.15,1,3,5250.80038740537,43.0058105592787,24.0210562207871,END: battery reserve SOC reached
-0.2,1,3,5562.51420675915,45.3636355906304,24.0210562207871,END: battery reserve SOC reached
-0.25,1,3,5882.04652204579,47.7369387715559,24.0210562207871,END: battery reserve SOC reached
-0.3,1,5,8418.60207847269,48.4811278096578,24.0210562207871,END: battery reserve SOC reached
-0.35,1,14,21262.5932483207,50.8605908940217,24.0210562207871,END: battery reserve SOC reached
-0.4,1,14,21452.6048413617,53.2517948660659,24.0210562207871,END: battery reserve SOC reached
-0.45,1,14,21296.8621522869,55.6533023508339,24.0210562207871,END: battery reserve SOC reached
-0.5,1,14,21321.4545520619,58.0637815642883,24.0210562207871,END: battery reserve SOC reached
+0,1,4,6986.48883822555,44.2869674787606,31.4882450269113,COMPLETE: commanded laps flown
+0.05,1,4,7025.85456135577,45.4211912143868,31.4852221447402,COMPLETE: commanded laps flown
+0.1,1,4,7066.51762565896,46.5535706388423,31.4816914041568,COMPLETE: commanded laps flown
+0.15,1,4,7107.76138832978,49.5822842703393,31.4786234508693,COMPLETE: commanded laps flown
+0.2,1,4,7144.69509070544,50.7140257094219,31.4751117752953,COMPLETE: commanded laps flown
+0.25,0,0,NaN,NaN,31.4719992618543,FAIL: runway exceeded before Vrot
+0.3,0,0,NaN,NaN,31.4685058708772,FAIL: runway exceeded before Vrot
+0.35,0,0,NaN,NaN,31.4653494589685,FAIL: runway exceeded before Vrot
+0.4,0,0,NaN,NaN,31.4618734484591,FAIL: runway exceeded before Vrot
+0.45,0,0,NaN,NaN,31.4586739088137,FAIL: runway exceeded before Vrot
+0.5,0,0,NaN,NaN,31.4552142890387,FAIL: runway exceeded before Vrot
+0.55,0,0,NaN,NaN,31.4519724692465,FAIL: runway exceeded before Vrot
+0.6,0,0,NaN,NaN,31.4485281940501,FAIL: runway exceeded before Vrot
+0.65,0,0,NaN,NaN,31.4452447131592,FAIL: runway exceeded before Vrot
+0.7,0,0,NaN,NaN,31.4418141814228,FAIL: runway exceeded before Vrot
+0.75,0,0,NaN,NaN,31.4384898300662,FAIL: runway exceeded before Vrot
+0.8,0,0,NaN,NaN,31.4350726139632,FAIL: runway exceeded before Vrot
+0.85,0,0,NaN,NaN,31.4317086767943,FAIL: runway exceeded before Vrot
+0.9,0,0,NaN,NaN,31.4283036529531,FAIL: runway exceeded before Vrot
+0.95,0,0,NaN,NaN,31.4249011032616,FAIL: runway exceeded before Vrot
+1,0,0,NaN,NaN,31.421507157566,FAIL: runway exceeded before Vrot
+1.05,0,0,NaN,NaN,31.4180669634244,FAIL: runway exceeded before Vrot
+1.1,0,0,NaN,NaN,31.4146830011509,FAIL: runway exceeded before Vrot
+1.15,0,0,NaN,NaN,31.4112061259872,FAIL: runway exceeded before Vrot
+1.2,0,0,NaN,NaN,31.4078310851272,FAIL: runway exceeded before Vrot
+1.25,0,0,NaN,NaN,31.4043184510134,FAIL: runway exceeded before Vrot
+1.3,0,0,NaN,NaN,31.4009512741277,FAIL: runway exceeded before Vrot
+1.35,0,0,NaN,NaN,31.3974038010865,FAIL: runway exceeded before Vrot
+1.4,0,0,NaN,NaN,31.3940433853223,FAIL: runway exceeded before Vrot
+1.45,0,0,NaN,NaN,31.3904608921412,FAIL: runway exceeded before Vrot
+1.5,0,0,NaN,NaN,31.3871055045228,FAIL: runway exceeded before Vrot

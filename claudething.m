@@ -37,10 +37,11 @@ cfg.useOptimizerResult = false;  % true -> top row of airfoil_ranking.csv
 cfg.optimizerFile      = 'airfoil_ranking.csv';
 
 % ---- Aircraft / aerodynamics ----
-cfg.ac.airfoil        = 's1223';
-cfg.ac.polarFile      = 'polars/s1223_Re100000_digitized.csv';
-cfg.ac.S              = 0.323;   % m^2
-cfg.ac.AR             = 12;
+cfg.ac.airfoil        = 's1210';
+cfg.ac.polarFile      = 'polars/s1210_Re100k_200K.csv';
+cfg.ac.span_m  = 1.49;   % FIXED wingspan (m)  [= 77.5 in]
+cfg.ac.chord_m = 0.2;   % DESIGN VARIABLE: constant (rectangular) wing chord (m)
+% S and AR are filled in by deriveWing():  S = span*chord,  AR = span/chord
 cfg.ac.e              = 0.80;
 cfg.ac.CD0_airframe   = 0.030;   % fuselage+tail+gear, referenced to S  (PLACEHOLDER)
 cfg.ac.CDA_extra      = 0.000;   % m^2 extra drag area (external stores etc.)
@@ -51,13 +52,17 @@ cfg.ac.CL_groundRoll  = 0.40;    % CL in ground-roll attitude
 cfg.ac.mu_roll        = 0.05;    % rolling friction (pavement ~0.04, grass ~0.08)
 cfg.ac.wingHeight_m   = 0.15;    % wing height above ground on gear
 cfg.ac.nMax           = 3.0;     % structural load-factor limit
-cfg.ac.ReCDexp        = -0.5;    % CD2D ~ Re^exp outside polar data (0 = off)
-
-% ---- Mass ----
+cfg.ac.ReCDexp        = -0.5; % CD2D ~ Re^exp outside polar data (0 = off)
+cfg.ac.CL_floor = 0.0; % control limit, independent of polar coverage
+cfg.mass.wingKgPerM2 = 0.0;    % kg of structure per m^2 of wing area (MEASURE from your build)
+cfg.mass.S_ref       = 0.323;  % wing area that empty_kg was estimated for
+% ---- Mass ----l
 cfg.mass.empty_kg        = 1.20;
-cfg.mass.dragArticles_kg = 1.20;
+cfg.mass.dragArticles_kg = 1.473;
+cfg.ac.dragArt.V = [7 10];
+cfg.ac.dragArt.F = [0.4412 0.8939];   % N, Pig + Banana + Chicken
 cfg.mass.battery_kg      = 0.150;
-cfg.mass.payload_kg      = 0.15;
+cfg.mass.payload_kg      = 1.2;
 
 % ---- Battery: 3S 1000 mAh LiPo ----
 cfg.batt.cells        = 3;
@@ -67,19 +72,19 @@ cfg.batt.R_wiring     = 0.005;   % ohm, leads + connectors
 cfg.batt.SOC0         = 1.00;
 cfg.batt.reserveSOC   = 0.20;    % mission ends here (= your 80% usable)
 cfg.batt.cutoffCell_V = 3.30;    % loaded cell-voltage floor
-cfg.batt.maxC         = 25;      % continuous C rating
+cfg.batt.maxC         = 80;      % continuous C rating
 cfg.batt.ocvSOC  = [0    0.05 0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90 1.00];
 cfg.batt.ocvCell = [3.27 3.61 3.69 3.73 3.77 3.79 3.82 3.87 3.92 3.98 4.08 4.20];
 
 % ---- Propulsion ----
 cfg.prop.mode       = 'model';   % 'model' or 'table'
-cfg.prop.Kv         = 1000;      % rpm/V                       (PLACEHOLDER)
-cfg.prop.Rm         = 0.10;      % ohm winding resistance      (PLACEHOLDER)
-cfg.prop.I0         = 0.5;       % A no-load current           (PLACEHOLDER)
+cfg.prop.Kv = 930;
+cfg.prop.Rm = 0.032;
+cfg.prop.I0 = 1.30;      % datasheet value at 10 V
 cfg.prop.etaESC     = 0.95;
-cfg.prop.D_m        = 10*0.0254; % 10x5-class prop             (PLACEHOLDER)
-cfg.prop.CT         = [0.105 -0.020 -0.240];  % CT = c0 + c1*J + c2*J^2
-cfg.prop.CP         = [0.045 -0.010 -0.060];  % CP = c0 + c1*J + c2*J^2
+cfg.prop.D_m = 11*0.0254;
+cfg.prop.CT  = [0.10206 -0.03144 -0.17420];
+cfg.prop.CP  = [0.03272  0.04407 -0.11585];
 cfg.prop.tableFile  = 'thrust/thrust_table.csv';
 cfg.prop.tableVtest = 11.1;      % pack voltage during thrust-stand test
 
@@ -87,15 +92,17 @@ cfg.prop.tableVtest = 11.1;      % pack voltage during thrust-stand test
 cfg.mis.dt              = 0.02;    % s
 cfg.mis.tMax            = 1800;    % s
 cfg.mis.targetTW        = 0.50;
-cfg.mis.runway_m        = 30.48;   % 100 ft                    (PLACEHOLDER: use rules)
+cfg.mis.runway_m        = 15;   % 100 ft                    (PLACEHOLDER: use rules)
 cfg.mis.VrotFactor      = 1.15;    % Vrot = factor * Vstall
+cfg.mis.VminFactor = 1.3;     % cruise speed is never below VminFactor * Vstal
 cfg.mis.cruiseAlt_m     = 30;
 cfg.mis.climbGamMax_deg = 10;
 cfg.mis.Vcruise_ms      = 11;
 cfg.mis.legLength_m     = 152.4;   % 500 ft straights
 cfg.mis.bank_deg        = 30;
-cfg.mis.nLaps           = inf;     % inf -> fly until reserve/cutoff
-cfg.mis.requiredLaps    = 3;       % pass/fail criterion
+cfg.mis.nLaps           = 4;     % inf -> fly until reserve/cutoff
+cfg.mis.requiredLaps    = 1;       % pass/fail criterion
+cfg.prop.thrMax = 1;
 
 % ---- Autopilot gains ----
 cfg.ap.kV_p   = 0.15;   % throttle per m/s speed error
@@ -108,23 +115,39 @@ cfg.ap.phiMaxStraight_deg = 15;
 
 % ---- Payload sweep ----
 cfg.sweep.enable   = true;
-cfg.sweep.payloads = 0:0.05:0.50;
-cfg.sweep.dt       = 0.05;         % coarser step for speed
+cfg.sweep.payloads = 0:0.05:1.50;
+cfg.sweep.dt       = 0.05; % coarser step for speed
+cfg.sweep.chordEnable = true;
+cfg.sweep.chordStart  = 0.12;   % m  first chord in the sweep
+cfg.sweep.chordEnd    = 0.28;   % m  last chord in the sweep
+cfg.sweep.chordStep   = 0.01;   % m  step between chords
+cfg.sweep.chords      = cfg.sweep.chordStart:cfg.sweep.chordStep:cfg.sweep.chordEnd;
+% (same idea as  cfg.sweep.payloads = 0:0.05:1.50 ; for a fixed NUMBER of points use
+%  cfg.sweep.chords = linspace(cfg.sweep.chordStart, cfg.sweep.chordEnd, 15); )
+cfg.sweep.chordNLaps  = inf;    % inf = fly to battery reserve (range)
 
 %% ================================ RUN ====================================
 if cfg.useOptimizerResult
     cfg = applyOptimizerResult(cfg);
 end
 
+cfg = deriveWing(cfg);
 M = buildModels(cfg);
 fprintf('Polar: %s | Re block(s): %s\n', cfg.ac.polarFile, mat2str(M.polar.Re));
 
 R = runMission(cfg, M);
 printSummary(R, cfg);
+selfCheck(R, cfg);
+%%    and, once, to test the time step:        
+convergenceCheck(cfg, M);
 plotMission(R, cfg, M);
 
 if cfg.sweep.enable
     SW = payloadSweep(cfg, M);
+    if cfg.sweep.chordEnable
+        CS = chordSweep(cfg, M);
+        writetable(CS, 'chord_sweep.csv');
+    end
     writetable(SW, 'payload_sweep.csv');
 end
 
@@ -133,8 +156,8 @@ function R = runMission(cfg, M)
     g = cfg.env.g;  rho = cfg.env.rho;  dt = cfg.mis.dt;
     N = floor(cfg.mis.tMax/dt) + 1;
 
-    mTot  = cfg.mass.empty_kg + cfg.mass.dragArticles_kg + ...
-            cfg.mass.battery_kg + cfg.mass.payload_kg;
+    mTot  = cfg.mass.empty_kg + cfg.mass.wingKgPerM2*(cfg.ac.S - cfg.mass.S_ref) + ...
+            cfg.mass.dragArticles_kg + cfg.mass.battery_kg + cfg.mass.payload_kg;
     W     = mTot*g;
     S     = cfg.ac.S;
     span  = sqrt(cfg.ac.AR*S);
@@ -142,6 +165,7 @@ function R = runMission(cfg, M)
 
     Vs   = sqrt(2*W/(rho*S*cfg.ac.CLmax3D_factor*M.CLmax2Dref));
     Vrot = cfg.mis.VrotFactor*Vs;
+    Vcmd = max(cfg.mis.Vcruise_ms, cfg.mis.VminFactor*Vs);
     T0   = propulsion(1, 0, cfg.batt.SOC0, cfg, M);
 
     s = zeros(9,1);              % [x y h V gam psi Ah_used Wh_used dist]
@@ -155,7 +179,6 @@ function R = runMission(cfg, M)
     status = 'END: tMax reached';
 
     hCmd    = cfg.mis.cruiseAlt_m;
-    Vcmd    = cfg.mis.Vcruise_ms;
     gamMax  = deg2rad(cfg.mis.climbGamMax_deg);
     bank    = deg2rad(cfg.mis.bank_deg);
     phiMaxS = deg2rad(cfg.ap.phiMaxStraight_deg);
@@ -194,18 +217,18 @@ function R = runMission(cfg, M)
         % ---------------- guidance & control ----------------
         u.phi = 0;
         if phase == 1
-            u.thr = 1;
-            u.CL  = cfg.ac.CL_groundRoll;
+            u.thr = cfg.prop.thrMax;
+            u.CL = cfg.ac.CL_groundRoll;
         else
             if phase == 2
-                u.thr  = 1;
+                u.thr = cfg.prop.thrMax;
                 gamCmd = min(ap.kh*(hCmd - h), gamMax) - ap.kVprot*max(Vcmd - V, 0);
                 gamCmd = max(gamCmd, 0);
                 u.phi  = clamp(ap.kpsi*wrapPi(psiRef - psi), -phiMaxS, phiMaxS);
             else
                 e      = Vcmd - V;
                 iV     = clamp(iV + ap.kV_i*e*dt, 0, 1);
-                u.thr  = clamp(ap.kV_p*e + iV, 0, 1);
+                u.thr = min(clamp(ap.kV_p*e + iV, 0, 1), cfg.prop.thrMax);
                 gamCmd = clamp(ap.kh*(hCmd - h), -gamMax, gamMax);
 
                 if legMode == 1
@@ -227,7 +250,7 @@ function R = runMission(cfg, M)
             % CL needed to track gamma command in a coordinated bank
             Lreq = (W*cos(gam) + mTot*Va*ap.kgam*(gamCmd - gam))/cos(u.phi);
             CLhi = min(cfg.ac.CL_clampFrac*CLmax3D, cfg.ac.nMax*W/(q*S));
-            u.CL = clamp(Lreq/(q*S), M.polar.CLmin, CLhi);
+            u.CL = clamp(Lreq/(q*S), cfg.ac.CL_floor, CLhi);
         end
 
         % ---------------- RK4 integration (ZOH controls) ----------------
@@ -282,6 +305,66 @@ function R = runMission(cfg, M)
     R.CLclamp_s        = sum(Lg.CL(air) >= 0.999*cfg.ac.CL_clampFrac*Lg.CLmax3D(air))*dt;
     R.pass = ~startsWith(status, 'FAIL') && laps >= cfg.mis.requiredLaps && ...
              R.maxC <= cfg.batt.maxC;
+    R.Vcmd = Vcmd;
+end
+
+function cfg = deriveWing(cfg)
+    cfg.ac.S  = cfg.ac.span_m*cfg.ac.chord_m;   % m^2
+    cfg.ac.AR = cfg.ac.span_m/cfg.ac.chord_m;   % rectangular wing
+end
+ 
+function CS = chordSweep(cfg, M)
+    ft = 3.280839895;
+    cfg.mis.dt    = cfg.sweep.dt;
+    cfg.mis.nLaps = cfg.sweep.chordNLaps;
+    C = cfg.sweep.chords(:);  n = numel(C);
+    S = nan(n,1); AR = nan(n,1); Vs = nan(n,1); Vrot = nan(n,1);
+    laps = zeros(n,1); dist_ft = nan(n,1); t_s = nan(n,1);
+    roll_ft = nan(n,1); peakC = nan(n,1); mAh = nan(n,1);
+    clFrac = nan(n,1); ok = false(n,1); status = strings(n,1);
+ 
+    fprintf('\n============ CHORD SWEEP (span %.3f m, payload %.2f kg) ============\n', ...
+        cfg.ac.span_m, cfg.mass.payload_kg);
+    for i = 1:n
+        c = cfg; 
+        c.ac.chord_m = C(i); 
+        c = deriveWing(c);
+        r  = runMission(c, M);
+        ph = r.log.phase == 3;
+        S(i) = c.ac.S;  AR(i) = c.ac.AR;  Vs(i) = r.Vs;  Vrot(i) = r.Vrot;
+        laps(i) = r.laps;  
+        dist_ft(i) = r.distance_m*ft; 
+        if startsWith(r.status, 'FAIL'), dist_ft(i) = NaN; end
+        t_s(i) = r.flightTime_s;
+        roll_ft(i) = r.groundRoll_m*ft;  peakC(i) = r.maxC;  mAh(i) = r.charge_Ah*1000;
+        clFrac(i) = max([0; r.log.CL(ph)./r.log.CLmax3D(ph)]);   % worst CL/CLmax in the laps
+        % acceptable = mission passes AND stays inside your own CL margin AND Vrot below cruise speed
+        ok(i) = r.pass && clFrac(i) <= cfg.ac.CL_margin && r.Vrot <= r.Vcmd;
+        status(i) = string(r.status);
+        fprintf(['%5.1f cm | S %.3f | AR %5.1f | Vs %5.2f Vrot %5.2f | laps %3d | %7.0f ft | ' ...
+                 'roll %5.1f ft | %4.1fC | CL/CLmax %.2f | %s | %s\n'], ...
+            100*C(i), S(i), AR(i), Vs(i), Vrot(i), laps(i), dist_ft(i), ...
+            roll_ft(i), peakC(i), clFrac(i), r.status, ...
+            string(ifelse(ok(i), 'OK', 'check')));
+    end
+    CS = table(C, S, AR, Vs, Vrot, laps, dist_ft, t_s, roll_ft, peakC, mAh, clFrac, ok, status, ...
+        'VariableNames', {'Chord_m','S_m2','AR','Vstall','Vrot','Laps','Distance_ft', ...
+                          'FlightTime_s','GroundRoll_ft','PeakC','Charge_mAh','CLoverCLmax','Acceptable','Status'});
+ 
+    figure('Name','Chord sweep','Color','w');
+    tiledlayout(1,2,'TileSpacing','compact');
+    nexttile; plot(100*C, dist_ft, '-o'); hold on; grid on;
+    plot(100*C(ok), dist_ft(ok), 'o', 'MarkerFaceColor', [0.2 0.7 0.2]);
+    xlabel('Chord (cm)'); ylabel('Distance per charge (ft)');
+    title('Range vs chord (filled = acceptable)');
+    nexttile; plot(100*C, clFrac, '-o'); hold on; grid on;
+    yline(cfg.ac.CL_margin, '--r', 'CL margin');
+    xlabel('Chord (cm)'); ylabel('max C_L / C_{Lmax} during laps');
+    title('Stall margin vs chord');
+end
+ 
+function s = ifelse(cond, a, b)
+    if cond, s = a; else, s = b; end
 end
 
 %% ============================== PLANT ====================================
@@ -300,7 +383,7 @@ function [ds, o] = plant(s, u, cfg, M, mTot, onGround)
     kGE = r/(1 + r);                                   % ground-effect factor
     CD  = CD2D + cfg.ac.CD0_airframe + kGE*u.CL^2/(pi*cfg.ac.e*AR);
     L   = q*S*u.CL;
-    D   = q*(S*CD + cfg.ac.CDA_extra);
+    D = q*(S*CD + M.fCdA(Va));
 
     [T, Ib, Vt, rpm] = propulsion(u.thr, Va, SOC, cfg, M);
 
@@ -432,6 +515,10 @@ end
 %% ============================== SETUP ====================================
 function M = buildModels(cfg)
     M.polar      = loadPolar(cfg.ac.polarFile);
+
+    CdA = cfg.ac.dragArt.F ./ (0.5*cfg.env.rho*cfg.ac.dragArt.V.^2);
+    M.fCdA = griddedInterpolant(cfg.ac.dragArt.V, CdA, 'linear', 'nearest');
+
     M.CLmax2Dref = max([M.polar.blocks.CLmax]);
     M.ocvPack    = griddedInterpolant(cfg.batt.ocvSOC, ...
                      cfg.batt.cells*cfg.batt.ocvCell, 'linear', 'nearest');
@@ -505,7 +592,8 @@ function plotMission(R, cfg, M)
     nexttile; plot(L.t, L.h*ft, 'LineWidth', 1.2); grid on;
     xlabel('t (s)'); ylabel('Altitude (ft)'); title('Altitude');
     nexttile; plot(L.t, L.V, 'LineWidth', 1.2); hold on; grid on;
-    yline(R.Vs, '--', 'V_{stall}'); yline(cfg.mis.Vcruise_ms, ':', 'V_{cmd}');
+    yline(R.Vs, '--', 'V_{stall}'); 
+    yline(R.Vcmd, ':', 'V_{cmd}');
     xlabel('t (s)'); ylabel('Airspeed (m/s)'); title('Airspeed');
     nexttile; plot(L.t, L.CL, 'LineWidth', 1.2); hold on; grid on;
     plot(L.t, cfg.ac.CL_margin*L.CLmax3D, '--');
@@ -546,13 +634,24 @@ function plotMission(R, cfg, M)
     xlabel('t (s)'); ylabel('Re');
     title(sprintf('Re in flight: %.0f%% of airborne time within +/-10%% of polar data', ...
         100*R.ReInRangeFrac));
+
+    figure('Name','Power vs Time','Color','w');
+    plot(L.t, L.P, 'LineWidth', 1.2); 
+    hold on; grid on;
+    xlabel('Time (s)'); 
+    ylabel('Electrical Power (W)');
+    title(sprintf('Wattage vs Time | Total Consumed: %.0f mAh', R.charge_Ah*1000));
 end
 
 function SW = payloadSweep(cfg, M)
+    cfg.sweep.chordEnable = true;
+    cfg.sweep.chords      = 0.12:0.01:0.28;   % m
+    cfg.sweep.chordNLaps  = 2;              % inf = fly to battery reserve (range)
     ft = 3.280839895;
     cfg.mis.dt = cfg.sweep.dt;
     P = cfg.sweep.payloads(:); n = numel(P);
-    pass = false(n,1); laps = zeros(n,1); dist_ft = nan(n,1);
+    pass = false(n,1); laps = zeros(n,1); 
+    dist_ft = nan(n,1);
     roll_ft = nan(n,1); maxC = nan(n,1); status = strings(n,1);
 
     passTxt = {'fail','PASS'};
@@ -560,7 +659,9 @@ function SW = payloadSweep(cfg, M)
     for i = 1:n
         c = cfg; c.mass.payload_kg = P(i);
         r = runMission(c, M);
-        pass(i) = r.pass; laps(i) = r.laps; dist_ft(i) = r.distance_m*ft;
+        pass(i) = r.pass; laps(i) = r.laps; 
+        dist_ft(i) = r.distance_m*ft;
+        if startsWith(r.status, 'FAIL'), dist_ft(i) = NaN; end
         roll_ft(i) = r.groundRoll_m*ft; maxC(i) = r.maxC; status(i) = string(r.status);
         fprintf('%5.2f kg | %-40s | laps %3d | %7.0f ft | roll %5.1f ft | %4.1fC | %s\n', ...
             P(i), r.status, r.laps, dist_ft(i), roll_ft(i), r.maxC, ...
@@ -585,6 +686,60 @@ function SW = payloadSweep(cfg, M)
     yline(cfg.mis.runway_m*ft, '--r', 'Runway');
     xlabel('Internal payload (kg)'); ylabel('Ground roll (ft)');
     title('Takeoff ground roll vs payload');
+end
+
+function selfCheck(R, cfg)
+    L = R.log;
+    fprintf('\n================ SELF-CHECK ================\n');
+ 
+    % 1) energy bookkeeping: integrated log vs the integrated state variables
+    Wh_int = trapz(L.t, L.P)/3600;   Ah_int = trapz(L.t, L.Ib)/3600;
+    fprintf('Energy: log %.3f Wh vs state %.3f Wh | charge: log %.4f Ah vs state %.4f Ah\n', ...
+        Wh_int, R.energy_Wh, Ah_int, R.charge_Ah);
+ 
+    % 2) steady straight cruise: thrust = drag, load factor = 1
+    m = L.phase == 3 & abs(L.phi) < deg2rad(3) & abs(L.V - R.Vcmd) < 0.2;
+    if any(m)
+        fprintf('Cruise: median T %.2f N vs D %.2f N | median n %.3f (expect 1.000)\n', ...
+            median(L.T(m)), median(L.D(m)), median(L.n(m)));
+    else
+        fprintf('Cruise: no steady straight segment found (check the speed plot)\n');
+    end
+ 
+    % 3) steady banked turns: n should be 1/cos(bank)
+    tn = L.phase == 3 & abs(L.phi - deg2rad(cfg.mis.bank_deg)) < 1e-6;
+    if any(tn)
+        fprintf('Turn:   median n %.3f vs 1/cos(bank) = %.3f\n', ...
+            median(L.n(tn)), 1/cos(deg2rad(cfg.mis.bank_deg)));
+    end
+ 
+    % 4) altitude hold during the laps
+    a3 = L.phase == 3;
+    if any(a3)
+        err = max(abs(L.h(a3) - cfg.mis.cruiseAlt_m));
+        fprintf('Max altitude error in laps: %.1f m %s\n', err, ...
+            string(ifelse(err > 5, '  <-- WARNING: not holding altitude', '')));
+    end
+ 
+    % 5) lift coefficient pinned at the clamp = flying at the edge of stall
+    if R.CLclamp_s > 0.5
+        fprintf('WARNING: CL pinned at the clamp for %.1f s - results are not trustworthy\n', R.CLclamp_s);
+    end
+    if startsWith(R.status, 'FAIL')
+        fprintf('WARNING: mission status is %s - distance/energy are for a crashed run\n', R.status);
+    end
+end
+ 
+function convergenceCheck(cfg, M)
+    dts = [0.04 0.02 0.01];
+    fprintf('\n============ TIME-STEP CONVERGENCE ============\n');
+    for i = 1:numel(dts)
+        c = cfg;  c.mis.dt = dts(i);
+        r = runMission(c, M);
+        fprintf('dt %.3f s: %7.0f ft | %6.1f mAh | roll %5.1f ft | %s\n', ...
+            dts(i), r.distance_m*3.280839895, r.charge_Ah*1000, r.groundRoll_m*3.280839895, r.status);
+    end
+    fprintf('Differences below about 1%% between 0.02 and 0.01 mean dt is fine.\n');
 end
 
 %% ============================== HELPERS ==================================
