@@ -77,16 +77,37 @@ cfg.batt.ocvSOC  = [0    0.05 0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90 1.00]
 cfg.batt.ocvCell = [3.27 3.61 3.69 3.73 3.77 3.79 3.82 3.87 3.92 3.98 4.08 4.20];
 
 % ---- Propulsion ----
-cfg.prop.mode       = 'model';   % 'model' or 'table'
-cfg.prop.Kv = 930;
-cfg.prop.Rm = 0.032;
-cfg.prop.I0 = 1.30;      % datasheet value at 10 V
+cfg.prop.mode       = 'ba1130';   % 'model' or 'table'
+cfg.prop.Kv = 1130;
+cfg.prop.Rm = 0.014;
+cfg.prop.I0 = 2.30;      % datasheet value at 10 V
 cfg.prop.etaESC     = 0.95;
-cfg.prop.D_m = 11*0.0254;
+cfg.prop.D_m = 12*0.0254;
 cfg.prop.CT  = [0.10206 -0.03144 -0.17420];
-cfg.prop.CP  = [0.03272  0.04407 -0.11585];
+cfg.prop.CP  = [0.0325  0.0637 -0.1676];
+cfg.prop.CtFile = 'prop/apce_12x6.csv';
 cfg.prop.tableFile  = 'thrust/thrust_table.csv';
 cfg.prop.tableVtest = 11.1;      % pack voltage during thrust-stand test
+
+% ---- buildModels(), add: ----
+if isfield(cfg.prop,'ctFile') && ~isempty(cfg.prop.ctFile)
+    Pt = readtable(cfg.prop.ctFile);
+    M.fCT = griddedInterpolant(Pt.J, Pt.CT, 'pchip', 'linear');
+else
+    M.fCT = @(J) cfg.prop.CT(1) + cfg.prop.CT(2)*J + cfg.prop.CT(3)*J.^2;
+end
+
+% ---- propulsion(): pass M through ----
+[T, Im, rpm] = motorProp(thr*Vt, V, cfg, M);
+
+% ---- motorProp(): new signature, replace the thrust line ----
+function [T, Im, rpm] = motorProp(Vm, V, ~, M)
+    ...                                   % rpm solve unchanged (uses CP quadratic)
+    J   = V/(n*D);
+    T   = rho*n^2*D^4*M.fCT(J);           % identical to old formula when fCT is the quadratic
+    Im  = max((Vm - Kt*2*pi*n)/p.Rm, 0);
+    rpm = 60*n;
+end
 
 % ---- Mission ----
 cfg.mis.dt              = 0.02;    % s
