@@ -39,7 +39,7 @@ cfg.optimizerFile      = 'airfoil_ranking.csv';
 % ---- Aircraft / aerodynamics ----
 cfg.ac.airfoil        = 's1210';
 cfg.ac.polarFile      = 'polars/s1210_Re100k_200K.csv';
-cfg.ac.span_m  = 1.49;   % FIXED wingspan (m)  [= 77.5 in]
+cfg.ac.span_m  = 1.33;   % FIXED wingspan (m)  [= 77.5 in]
 cfg.ac.chord_m = 0.2;   % DESIGN VARIABLE: constant (rectangular) wing chord (m)
 % S and AR are filled in by deriveWing():  S = span*chord,  AR = span/chord
 cfg.ac.e              = 0.80;
@@ -57,12 +57,13 @@ cfg.ac.CL_floor = 0.0; % control limit, independent of polar coverage
 cfg.mass.wingKgPerM2 = 0.0;    % kg of structure per m^2 of wing area (MEASURE from your build)
 cfg.mass.S_ref       = 0.323;  % wing area that empty_kg was estimated for
 % ---- Mass ----l
-cfg.mass.empty_kg        = 1.20;
-cfg.mass.dragArticles_kg = 1.473;
+cfg.mass.empty_kg        = 1.27;
+cfg.mass.dragArticles_kg = 0;
 cfg.ac.dragArt.V = [7 10];
-cfg.ac.dragArt.F = [0.4412 0.8939];   % N, Pig + Banana + Chicken
+cfg.ac.dragArt.F = [0 0];
+%cfg.ac.dragArt.F = [0.4412 0.8939];   % N, Pig + Banana + Chicken
 cfg.mass.battery_kg      = 0.150;
-cfg.mass.payload_kg      = 1.2;
+cfg.mass.payload_kg      = 0.5;
 
 % ---- Battery: 3S 1000 mAh LiPo ----
 cfg.batt.cells        = 3;
@@ -77,10 +78,10 @@ cfg.batt.ocvSOC  = [0    0.05 0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90 1.00]
 cfg.batt.ocvCell = [3.27 3.61 3.69 3.73 3.77 3.79 3.82 3.87 3.92 3.98 4.08 4.20];
 
 % ---- Propulsion ----
-cfg.prop.mode       = 'ba1130';   % 'model' or 'table'
-cfg.prop.Kv = 1130;
-cfg.prop.Rm = 0.014;
-cfg.prop.I0 = 2.30;      % datasheet value at 10 V
+cfg.prop.mode       = 'model';   % 'model' or 'table'
+cfg.prop.Kv = 930;
+cfg.prop.Rm = 0.032;
+cfg.prop.I0 = 1.30;      % datasheet value at 10 V
 cfg.prop.etaESC     = 0.95;
 cfg.prop.D_m = 12*0.0254;
 cfg.prop.CT  = [0.10206 -0.03144 -0.17420];
@@ -89,25 +90,6 @@ cfg.prop.CtFile = 'prop/apce_12x6.csv';
 cfg.prop.tableFile  = 'thrust/thrust_table.csv';
 cfg.prop.tableVtest = 11.1;      % pack voltage during thrust-stand test
 
-% ---- buildModels(), add: ----
-if isfield(cfg.prop,'ctFile') && ~isempty(cfg.prop.ctFile)
-    Pt = readtable(cfg.prop.ctFile);
-    M.fCT = griddedInterpolant(Pt.J, Pt.CT, 'pchip', 'linear');
-else
-    M.fCT = @(J) cfg.prop.CT(1) + cfg.prop.CT(2)*J + cfg.prop.CT(3)*J.^2;
-end
-
-% ---- propulsion(): pass M through ----
-[T, Im, rpm] = motorProp(thr*Vt, V, cfg, M);
-
-% ---- motorProp(): new signature, replace the thrust line ----
-function [T, Im, rpm] = motorProp(Vm, V, ~, M)
-    ...                                   % rpm solve unchanged (uses CP quadratic)
-    J   = V/(n*D);
-    T   = rho*n^2*D^4*M.fCT(J);           % identical to old formula when fCT is the quadratic
-    Im  = max((Vm - Kt*2*pi*n)/p.Rm, 0);
-    rpm = 60*n;
-end
 
 % ---- Mission ----
 cfg.mis.dt              = 0.02;    % s
@@ -123,7 +105,7 @@ cfg.mis.legLength_m     = 152.4;   % 500 ft straights
 cfg.mis.bank_deg        = 30;
 cfg.mis.nLaps           = 4;     % inf -> fly until reserve/cutoff
 cfg.mis.requiredLaps    = 1;       % pass/fail criterion
-cfg.prop.thrMax = 1;
+cfg.prop.thrMax = 0.9;
 
 % ---- Autopilot gains ----
 cfg.ap.kV_p   = 0.15;   % throttle per m/s speed error
@@ -321,6 +303,14 @@ function R = runMission(cfg, M)
     R.energy_Wh    = s(8);  R.charge_Ah = s(7);
     R.maxIb = max(Lg.Ib);   R.maxC = R.maxIb/cfg.batt.capacity_Ah;
     R.minCellV = min(Lg.cellV);
+
+    R.maxThrust_N       = max(Lg.T);
+    R.meanThrustRoll_N  = mean(Lg.T(Lg.phase == 1));   % takeoff roll
+    R.meanThrustClimb_N = mean(Lg.T(Lg.phase == 2));   % climb
+    R.meanThrustLaps_N  = mean(Lg.T(Lg.phase == 3));   % laps (cruise + turns)
+    R.thrustImpulse_Ns  = trapz(Lg.t, Lg.T);           % total impulse over the run
+
+
     R.ReInRangeFrac    = mean(Lg.inRange(air));
     R.CLmarginExceed_s = sum(Lg.CL(air) > cfg.ac.CL_margin*Lg.CLmax3D(air))*dt;
     R.CLclamp_s        = sum(Lg.CL(air) >= 0.999*cfg.ac.CL_clampFrac*Lg.CLmax3D(air))*dt;
@@ -437,7 +427,7 @@ function [T, Ib, Vt, rpm] = propulsion(thr, V, SOC, cfg, M)
     for it = 1:4                          % battery <-> motor coupling
         Vt = max(ocv - Ib*Rp, 0);
         if strcmp(M.propMode, 'model')
-            [T, Im, rpm] = motorProp(thr*Vt, V, cfg);
+            [T, Im, rpm] = motorProp(thr*Vt, V, cfg, M);
             Ib = thr*Im/cfg.prop.etaESC;
         else
             sc  = Vt/cfg.prop.tableVtest;  % first-order voltage correction
@@ -449,7 +439,7 @@ function [T, Ib, Vt, rpm] = propulsion(thr, V, SOC, cfg, M)
     Vt = max(ocv - Ib*Rp, 0);
 end
 
-function [T, Im, rpm] = motorProp(Vm, V, cfg)
+function [T, Im, rpm] = motorProp(Vm, V, cfg, M)
 % Torque balance  Qmotor(n) = Qprop(n), solved in closed form.
 %   Qprop = rho*n^2*D^5*CP(J)/(2*pi),  J = V/(n*D)  -> quadratic in n
 %   Qmotor = Kt*((Vm - Kt*2*pi*n)/Rm - I0)          -> linear in n
@@ -469,7 +459,8 @@ function [T, Im, rpm] = motorProp(Vm, V, cfg)
     if n <= 0
         T = 0; Im = 0; rpm = 0; return;
     end
-    T   = rho*(p.CT(1)*n^2*D^4 + p.CT(2)*V*n*D^3 + p.CT(3)*V^2*D^2);
+    J   = V/(n*D);
+    T   = rho*n^2*D^4*M.fCT(J);
     Im  = max((Vm - Kt*2*pi*n)/p.Rm, 0);
     rpm = 60*n;
 end
@@ -544,6 +535,30 @@ function M = buildModels(cfg)
     M.ocvPack    = griddedInterpolant(cfg.batt.ocvSOC, ...
                      cfg.batt.cells*cfg.batt.ocvCell, 'linear', 'nearest');
     M.propMode   = lower(cfg.prop.mode);
+
+    if isfield(cfg.prop, 'CtFile') && ~isempty(cfg.prop.CtFile)
+    if ~isfile(cfg.prop.CtFile)
+        error(['Prop CT file not found: %s\n' ...
+               'Fix the path or set cfg.prop.CtFile = '''' to use the quadratic CT.'], cfg.prop.CtFile);
+    end
+    Pt = readtable(cfg.prop.CtFile);
+    assert(all(ismember({'J','CT'}, Pt.Properties.VariableNames)), ...
+        'Prop CT file %s needs columns J and CT.', cfg.prop.CtFile);
+    Pt = rmmissing(Pt, 'DataVariables', {'J','CT'});
+    Pt = sortrows(Pt(:, {'J','CT'}), 'J');
+    [~, iu] = unique(Pt.J, 'stable');           % the interpolant needs unique J
+    Pt = Pt(iu, :);
+    if min(Pt.J) > 0.02
+        warning(['Prop CT table has no static (J = 0) row: adding J = 0, CT = %.3f ' ...
+                 '(cfg.prop.CT0_static) so takeoff thrust is not extrapolated.'], cfg.prop.CT0_static);
+        Pt = [table(0, cfg.prop.CT0_static, 'VariableNames', {'J','CT'}); Pt];
+    end
+    M.fCT = griddedInterpolant(Pt.J, Pt.CT, 'pchip', 'linear');
+else
+    ct = cfg.prop.CT;
+    M.fCT = @(J) ct(1) + ct(2)*J + ct(3)*J.^2;
+    end
+
     switch M.propMode
         case 'model'
         case 'table'
@@ -586,8 +601,17 @@ function printSummary(R, cfg)
     fprintf('Airfoil / S / AR:     %s / %.3f m^2 / %.1f\n', cfg.ac.airfoil, cfg.ac.S, cfg.ac.AR);
     fprintf('Total mass:           %.3f kg (payload %.3f kg)\n', R.mTot, cfg.mass.payload_kg);
     fprintf('Vstall(1g) / Vrot:    %.2f / %.2f m/s\n', R.Vs, R.Vrot);
+    gf = 1000/cfg.env.g;   % N -> grams-force (1 N = 101.97 gf)
     fprintf('Static thrust, T/W:   %.2f N, %.2f (target %.2f)\n', ...
-        R.staticThrust_N, R.staticTW, cfg.mis.targetTW);
+        R.staticThrust_N*gf, R.staticTW, cfg.mis.targetTW);
+
+    
+    fprintf('Peak thrust:          %.0f g (T/W %.2f)\n', R.maxThrust_N*gf, R.maxThrust_N/R.W);
+    fprintf('Mean thrust roll/climb/laps: %.0f / %.0f / %.0f g\n', ...
+        R.meanThrustRoll_N*gf, R.meanThrustClimb_N*gf, R.meanThrustLaps_N*gf);
+    fprintf('Total thrust impulse: %.0f N*s\n', R.thrustImpulse_Ns);
+
+
     fprintf('Ground roll:          %.1f ft (runway %.1f ft)\n', ...
         R.groundRoll_m*ft, cfg.mis.runway_m*ft);
     fprintf('Laps completed:       %d\n', R.laps);
