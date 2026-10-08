@@ -1,4 +1,4 @@
-# Cargo Aircraft Mission Simulation (MATLAB)
+# Cargo Aircraft Mission Simulation (MATLAB) Design 27
 
 A time-domain mission simulation for a small electric cargo aircraft: takeoff roll, climb to a cruise altitude, then banked racetrack laps on a 3S LiPo pack. It sits on top of the steady-state sizing tool `cargo_airfoil_optimizer.m` and answers questions the steady-state tool cannot: does the aircraft actually take off, hold altitude in turns, and finish the laps before the battery runs out.
 
